@@ -1,0 +1,20 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Secrets
+.env
+*.cookie
+cookies.txt
+
+# Uploaded/generated files
+backend/uploads/*
+backend/transcripts/*
+
+# Frontend
+frontend/node_modules/
+frontend/.next/
+
+# IDE
+.vscode/
