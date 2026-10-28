@@ -6,6 +6,7 @@ import sys
 
 def download_youtube_audio(url: str, lecture_id: str, upload_dir: Path):
     output_template = upload_dir / f"{lecture_id}.%(ext)s"
+    expected_file = upload_dir / f"{lecture_id}.mp3"
 
     command = [
     sys.executable,
@@ -19,6 +20,7 @@ def download_youtube_audio(url: str, lecture_id: str, upload_dir: Path):
     "mp3",
     "--audio-quality",
     "5",
+    "--no-progress",
     "-o",
     str(output_template),
     url,
@@ -31,21 +33,32 @@ def download_youtube_audio(url: str, lecture_id: str, upload_dir: Path):
             cookies_browser,
         ]
 
-    result = subprocess.run(
-        command,
-        capture_output=True,
-        text=True
-    )
+    try:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=300
+        )
+    except subprocess.TimeoutExpired as error:
+        _remove_downloaded_files(upload_dir, lecture_id)
+        raise RuntimeError("YouTube audio download timed out.") from error
+    except OSError as error:
+        _remove_downloaded_files(upload_dir, lecture_id)
+        raise RuntimeError("Unable to start the YouTube audio downloader.") from error
 
     if result.returncode != 0:
-        raise RuntimeError(result.stderr)
+        _remove_downloaded_files(upload_dir, lecture_id)
+        raise RuntimeError("yt-dlp could not download the YouTube audio.")
 
-    downloaded_files = [
-        file for file in upload_dir.glob(f"{lecture_id}.*")
-        if file.suffix.lower() not in {".wav", ".json"}
-    ]
-
-    if not downloaded_files:
+    if not expected_file.is_file():
+        _remove_downloaded_files(upload_dir, lecture_id)
         raise RuntimeError("YouTube audio file was not created.")
 
-    return downloaded_files[0]
+    return expected_file
+
+
+def _remove_downloaded_files(upload_dir: Path, lecture_id: str):
+    for file in upload_dir.glob(f"{lecture_id}.*"):
+        if file.is_file():
+            file.unlink()
